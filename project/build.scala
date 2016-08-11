@@ -1,3 +1,4 @@
+import io.gatling.sbt.GatlingPlugin
 import sbt._
 import Keys._
 import org.scalatra.sbt._
@@ -14,7 +15,7 @@ object BptScalaBuild extends Build {
   val ScalaVersion = "2.11.8"
   val ScalatraVersion = "2.4.0"
 
-  lazy val project = Project (
+  lazy val aaaMain = Project (
     "bpt-scala",
     file("."),
     settings = ScalatraPlugin.scalatraSettings ++ scalateSettings ++ Seq(
@@ -55,7 +56,22 @@ object BptScalaBuild extends Build {
       },
       containerPort in Jetty := 3000
     )
-  ).enablePlugins(JettyPlugin).aggregate(codegen).settings()
+  ).enablePlugins(JettyPlugin).aggregate(codegen)
 
   lazy val codegen = Project("codegen", file("codegen"))
+
+  lazy val loadTest = Project(
+    "load-test",
+    file("load-test"),
+    settings = Seq(
+      organization := Organization,
+      name := "bpt-load-test",
+      version := Version,
+      scalaVersion := ScalaVersion,
+      libraryDependencies ++= Seq(
+        "io.gatling"            % "gatling-test-framework"    % "2.2.2",
+        "io.gatling.highcharts" % "gatling-charts-highcharts" % "2.2.2"
+      )
+    )
+  ).enablePlugins(GatlingPlugin).dependsOn(aaaMain)
 }

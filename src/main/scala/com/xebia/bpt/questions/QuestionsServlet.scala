@@ -25,7 +25,7 @@ class QuestionsService(val db: Database) {
 
   private def fetchQuestions(questionsQuery: Query[Questions, QuestionsRow, Seq]): DBIO[Iterable[Question]] = {
     val query = for {
-      ((question, _), label) <- questionsQuery join LabelsPerQuestion on (_.id === _.questionId) join Labels on (_._2.labelId === _.id)
+      (question, label) <- questionsQuery join Labels on (_.id === _.questionId)
     } yield (question, label)
 
     query.result.map(_.groupBy(_._1).map {
@@ -37,11 +37,7 @@ class QuestionsService(val db: Database) {
   private def insertLabels(questionId: Int, labels: (String, String)*): DBIO[Seq[Int]] = {
     DBIO.sequence(labels.map {
       case (language, value) =>
-        val labelQuery =
-          Labels.map(l => l.language -> l.value) returning Labels.map(_.id) forceInsert(language -> value)
-        labelQuery.flatMap { labelId =>
-          LabelsPerQuestion.map(lpq => lpq.questionId -> lpq.labelId).forceInsert(questionId, labelId)
-        }
+        Labels.map(l => l.language -> l.value) returning Labels.map(_.id) forceInsert(language -> value)
     })
   }
 
@@ -64,11 +60,10 @@ class QuestionsService(val db: Database) {
   }
 
   def update(questionId: Int, question: Question): Future[Question] = {
-    val deleteLabelsAction = LabelsPerQuestion.filter(_.questionId === questionId).delete
     val updateQuestionAction = Questions.filter(_.id === questionId).map(_.name).update(question.name)
     val insertLabelsAction = insertLabels(questionId, question.labels.toSeq: _*)
 
-    db.run((deleteLabelsAction >> updateQuestionAction >> insertLabelsAction).transactionally).flatMap { sts =>
+    db.run((updateQuestionAction >> insertLabelsAction).transactionally).flatMap { sts =>
       if (sts.forall(s => s > 0)) Future.successful(question)
       else Future.failed(FailureException(s"Could not update question with id ${question.id}"))
     }

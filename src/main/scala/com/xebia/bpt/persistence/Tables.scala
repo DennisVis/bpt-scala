@@ -14,25 +14,26 @@ trait Tables {
   import slick.jdbc.{GetResult => GR}
 
   /** DDL for all tables. Call .create to execute. */
-  lazy val schema: profile.SchemaDescription = Labels.schema ++ LabelsPerQuestion.schema ++ Questions.schema
+  lazy val schema: profile.SchemaDescription = Labels.schema ++ Questions.schema
   @deprecated("Use .schema instead of .ddl", "3.0")
   def ddl = schema
 
   /** Entity class storing rows of table Labels
    *  @param id Database column id SqlType(serial), AutoInc, PrimaryKey
    *  @param language Database column language SqlType(varchar), Length(2,true)
-   *  @param value Database column value SqlType(varchar), Length(255,true) */
-  case class LabelsRow(id: Int, language: String, value: String)
+   *  @param value Database column value SqlType(varchar), Length(255,true)
+   *  @param questionId Database column question_id SqlType(int4), Default(None) */
+  case class LabelsRow(id: Int, language: String, value: String, questionId: Option[Int] = None)
   /** GetResult implicit for fetching LabelsRow objects using plain SQL queries */
-  implicit def GetResultLabelsRow(implicit e0: GR[Int], e1: GR[String]): GR[LabelsRow] = GR{
+  implicit def GetResultLabelsRow(implicit e0: GR[Int], e1: GR[String], e2: GR[Option[Int]]): GR[LabelsRow] = GR{
     prs => import prs._
-    LabelsRow.tupled((<<[Int], <<[String], <<[String]))
+    LabelsRow.tupled((<<[Int], <<[String], <<[String], <<?[Int]))
   }
   /** Table description of table labels. Objects of this class serve as prototypes for rows in queries. */
   class Labels(_tableTag: Tag) extends Table[LabelsRow](_tableTag, "labels") {
-    def * = (id, language, value) <> (LabelsRow.tupled, LabelsRow.unapply)
+    def * = (id, language, value, questionId) <> (LabelsRow.tupled, LabelsRow.unapply)
     /** Maps whole row to an option. Useful for outer joins. */
-    def ? = (Rep.Some(id), Rep.Some(language), Rep.Some(value)).shaped.<>({r=>import r._; _1.map(_=> LabelsRow.tupled((_1.get, _2.get, _3.get)))}, (_:Any) =>  throw new Exception("Inserting into ? projection not supported."))
+    def ? = (Rep.Some(id), Rep.Some(language), Rep.Some(value), questionId).shaped.<>({r=>import r._; _1.map(_=> LabelsRow.tupled((_1.get, _2.get, _3.get, _4)))}, (_:Any) =>  throw new Exception("Inserting into ? projection not supported."))
 
     /** Database column id SqlType(serial), AutoInc, PrimaryKey */
     val id: Rep[Int] = column[Int]("id", O.AutoInc, O.PrimaryKey)
@@ -40,40 +41,14 @@ trait Tables {
     val language: Rep[String] = column[String]("language", O.Length(2,varying=true))
     /** Database column value SqlType(varchar), Length(255,true) */
     val value: Rep[String] = column[String]("value", O.Length(255,varying=true))
+    /** Database column question_id SqlType(int4), Default(None) */
+    val questionId: Rep[Option[Int]] = column[Option[Int]]("question_id", O.Default(None))
+
+    /** Foreign key referencing Questions (database name question_fkey) */
+    lazy val questionsFk = foreignKey("question_fkey", questionId, Questions)(r => Rep.Some(r.id), onUpdate=ForeignKeyAction.Cascade, onDelete=ForeignKeyAction.Cascade)
   }
   /** Collection-like TableQuery object for table Labels */
   lazy val Labels = new TableQuery(tag => new Labels(tag))
-
-  /** Entity class storing rows of table LabelsPerQuestion
-   *  @param questionId Database column question_id SqlType(int4)
-   *  @param labelId Database column label_id SqlType(int4) */
-  case class LabelsPerQuestionRow(questionId: Int, labelId: Int)
-  /** GetResult implicit for fetching LabelsPerQuestionRow objects using plain SQL queries */
-  implicit def GetResultLabelsPerQuestionRow(implicit e0: GR[Int]): GR[LabelsPerQuestionRow] = GR{
-    prs => import prs._
-    LabelsPerQuestionRow.tupled((<<[Int], <<[Int]))
-  }
-  /** Table description of table labels_per_question. Objects of this class serve as prototypes for rows in queries. */
-  class LabelsPerQuestion(_tableTag: Tag) extends Table[LabelsPerQuestionRow](_tableTag, "labels_per_question") {
-    def * = (questionId, labelId) <> (LabelsPerQuestionRow.tupled, LabelsPerQuestionRow.unapply)
-    /** Maps whole row to an option. Useful for outer joins. */
-    def ? = (Rep.Some(questionId), Rep.Some(labelId)).shaped.<>({r=>import r._; _1.map(_=> LabelsPerQuestionRow.tupled((_1.get, _2.get)))}, (_:Any) =>  throw new Exception("Inserting into ? projection not supported."))
-
-    /** Database column question_id SqlType(int4) */
-    val questionId: Rep[Int] = column[Int]("question_id")
-    /** Database column label_id SqlType(int4) */
-    val labelId: Rep[Int] = column[Int]("label_id")
-
-    /** Primary key of LabelsPerQuestion (database name labels_per_question_pk) */
-    val pk = primaryKey("labels_per_question_pk", (questionId, labelId))
-
-    /** Foreign key referencing Labels (database name labels_per_question_label_id) */
-    lazy val labelsFk = foreignKey("labels_per_question_label_id", labelId, Labels)(r => r.id, onUpdate=ForeignKeyAction.Cascade, onDelete=ForeignKeyAction.Cascade)
-    /** Foreign key referencing Questions (database name labels_per_question_question_id) */
-    lazy val questionsFk = foreignKey("labels_per_question_question_id", questionId, Questions)(r => r.id, onUpdate=ForeignKeyAction.Cascade, onDelete=ForeignKeyAction.Cascade)
-  }
-  /** Collection-like TableQuery object for table LabelsPerQuestion */
-  lazy val LabelsPerQuestion = new TableQuery(tag => new LabelsPerQuestion(tag))
 
   /** Entity class storing rows of table Questions
    *  @param id Database column id SqlType(serial), AutoInc, PrimaryKey
